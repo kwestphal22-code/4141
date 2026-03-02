@@ -1,4 +1,3 @@
-🚀 PROFESSIONAL INVENTORY SYSTEM (FINAL VERSION)
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,13 +31,8 @@ justify-content:space-between;
 align-items:center;
 }
 
-header h1{
-margin:0;
-font-size:20px;
-}
-
 .badge{
-padding:5px 10px;
+padding:5px 12px;
 border-radius:20px;
 font-size:12px;
 font-weight:bold;
@@ -59,7 +53,6 @@ border:none;
 background:none;
 color:white;
 cursor:pointer;
-transition:.2s;
 }
 
 nav button.active,
@@ -94,7 +87,6 @@ text-align:center;
 th{
 background:var(--primary);
 color:white;
-font-weight:500;
 }
 
 button{
@@ -112,7 +104,7 @@ font-weight:500;
 
 button:hover{opacity:.85;}
 
-input,select{
+input{
 padding:6px;
 border-radius:6px;
 border:1px solid #d1d5db;
@@ -125,7 +117,13 @@ border:1px solid #d1d5db;
 
 .hidden{display:none;}
 
-#login{
+#errorMsg{
+color:var(--danger);
+margin-top:10px;
+font-weight:bold;
+}
+
+#loginCard{
 max-width:400px;
 margin:100px auto;
 }
@@ -133,17 +131,20 @@ margin:100px auto;
 </head>
 <body>
 
-<div id="login" class="card">
+<div id="loginCard" class="card">
 <h2>Login</h2>
 <input id="username" placeholder="Name"><br><br>
-<input id="pin" type="password" placeholder="PIN"><br><br>
+<input id="pin" type="password" placeholder="PIN">
+<button onclick="togglePassword()">Show</button>
+<br><br>
 <button class="btn-primary" onclick="login()">Login</button>
+<div id="errorMsg"></div>
 </div>
 
 <div id="app" class="hidden">
 
 <header>
-<h1>SpaceOptions Inventory System</h1>
+<h3>SpaceOptions Inventory</h3>
 <div>
 <span id="roleBadge" class="badge"></span>
 <button class="btn-danger" onclick="logout()">Logout</button>
@@ -154,6 +155,7 @@ margin:100px auto;
 <button class="tabBtn active" data-tab="dashboard">Dashboard</button>
 <button class="tabBtn" data-tab="inventory">Inventory</button>
 <button class="tabBtn" data-tab="requests">Requests</button>
+<button class="tabBtn" data-tab="settings">Settings</button>
 </nav>
 
 <div class="container">
@@ -170,13 +172,13 @@ margin:100px auto;
 <div id="inventory" class="tab hidden">
 <div class="card">
 <h3>Inventory</h3>
-<input id="search" placeholder="Search material..." onkeyup="renderInventory()">
+<input id="search" placeholder="Search..." onkeyup="renderInventory()">
 <table>
 <thead>
 <tr>
 <th>Material</th>
 <th>Type</th>
-<th>Quantity</th>
+<th>Qty</th>
 <th>Min</th>
 <th>Adjust</th>
 </tr>
@@ -187,14 +189,14 @@ margin:100px auto;
 </div>
 
 <div id="requests" class="tab hidden">
-<div class="card">
+<div class="card" id="requestFormCard">
 <h3>New Request</h3>
 <div id="requestForm"></div>
-<button id="submitRequest" class="btn-primary" onclick="submitRequest()">Submit Request</button>
+<button id="submitRequest" class="btn-primary" onclick="submitRequest()">Submit</button>
 </div>
 
 <div class="card">
-<h3>All Requests</h3>
+<h3>Requests</h3>
 <table>
 <thead>
 <tr>
@@ -210,11 +212,18 @@ margin:100px auto;
 </div>
 </div>
 
+<div id="settings" class="tab hidden">
+<div class="card">
+<h3>Manager Settings</h3>
+<div id="pinResetSection"></div>
+</div>
+</div>
+
 </div>
 </div>
 
 <script>
-const builders=[
+const defaultBuilders=[
 {name:'Panther',pin:'1234'},
 {name:'Will',pin:'1234'},
 {name:'Brady',pin:'1234'},
@@ -230,6 +239,9 @@ const defaultMaterials=[
 {name:'Screws',type:'Hardware',qty:2000,min:500}
 ];
 
+if(!localStorage.getItem('builders'))
+localStorage.setItem('builders',JSON.stringify(defaultBuilders));
+
 if(!localStorage.getItem('materials'))
 localStorage.setItem('materials',JSON.stringify(defaultMaterials));
 
@@ -242,31 +254,64 @@ let isManager=false;
 function getData(k){return JSON.parse(localStorage.getItem(k)||'[]');}
 function saveData(k,d){localStorage.setItem(k,JSON.stringify(d));}
 
+function togglePassword(){
+pin.type=pin.type==="password"?"text":"password";
+}
+
 function login(){
 const u=username.value.trim();
 const p=pin.value.trim();
+const builders=getData('builders');
 
-if(builders.find(b=>b.name===u&&b.pin===p)){currentUser=u;isManager=false;}
-else if(u===manager.name&&p===manager.pin){currentUser=u;isManager=true;}
-else{alert("Invalid login");return;}
+if(builders.find(b=>b.name===u&&b.pin===p)){
+currentUser=u;isManager=false;
+}
+else if(u===manager.name&&p===manager.pin){
+currentUser=u;isManager=true;
+}
+else{
+errorMsg.textContent="Invalid username or PIN";
+return;
+}
 
-login.classList.add("hidden");
-app.classList.remove("hidden");
+localStorage.setItem("sessionUser",u);
+localStorage.setItem("sessionRole",isManager?"manager":"builder");
+
+startApp();
+}
+
+function startApp(){
+document.getElementById("loginCard").classList.add("hidden");
+document.getElementById("app").classList.remove("hidden");
+
 roleBadge.textContent=isManager?"Manager":"Builder";
 roleBadge.className="badge "+(isManager?"manager":"builder");
 
 if(isManager){
-requestForm.innerHTML="";
-submitRequest.style.display="none";
-}
-else{
+requestFormCard.style.display="none";
+buildPinReset();
+}else{
 buildRequestForm();
 }
 
 renderAll();
 }
 
-function logout(){location.reload();}
+function logout(){
+localStorage.removeItem("sessionUser");
+localStorage.removeItem("sessionRole");
+location.reload();
+}
+
+window.onload=function(){
+const sessionUser=localStorage.getItem("sessionUser");
+const role=localStorage.getItem("sessionRole");
+if(sessionUser){
+currentUser=sessionUser;
+isManager=role==="manager";
+startApp();
+}
+};
 
 document.querySelectorAll(".tabBtn").forEach(btn=>{
 btn.onclick=()=>{
@@ -274,7 +319,6 @@ document.querySelectorAll(".tabBtn").forEach(b=>b.classList.remove("active"));
 document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
 btn.classList.add("active");
 document.getElementById(btn.dataset.tab).classList.remove("hidden");
-renderAll();
 };
 });
 
@@ -288,11 +332,8 @@ pendingCount.textContent=requests.filter(r=>r.status==='Pending').length;
 
 function renderInventory(){
 const materials=getData('materials');
-const searchVal=search.value.toLowerCase();
 inventoryBody.innerHTML='';
-
-materials.filter(m=>m.name.toLowerCase().includes(searchVal))
-.forEach((m,i)=>{
+materials.forEach((m,i)=>{
 inventoryBody.innerHTML+=`
 <tr>
 <td>${m.name}</td>
@@ -319,15 +360,13 @@ function buildRequestForm(){
 const materials=getData('materials');
 requestForm.innerHTML=`Job: <input id="jobName"><br><br>`;
 materials.forEach((m,i)=>{
-requestForm.innerHTML+=`
-${m.name}:
-<input type="number" id="req_${i}" style="width:80px;"> sq ft<br><br>`;
+requestForm.innerHTML+=`${m.name}: <input type="number" id="req_${i}" style="width:80px;"> sq ft<br><br>`;
 });
 }
 
 function submitRequest(){
 const job=jobName.value.trim();
-if(!job){alert("Enter job name");return;}
+if(!job)return;
 
 const materials=getData('materials');
 let items=[];
@@ -335,26 +374,24 @@ materials.forEach((m,i)=>{
 const qty=parseInt(document.getElementById(`req_${i}`).value);
 if(qty>0)items.push({name:m.name,qty});
 });
-if(items.length===0){alert("Enter quantities");return;}
+if(items.length===0)return;
 
 const requests=getData('requests');
 requests.push({builder:currentUser,job,items,status:'Pending'});
 saveData('requests',requests);
 renderAll();
-alert("Request submitted");
 }
 
 function renderRequests(){
 let requests=getData('requests');
 requestsBody.innerHTML='';
-
 if(!isManager)
 requests=requests.filter(r=>r.builder===currentUser);
 
 requests.forEach((r,i)=>{
 const list=r.items.map(it=>`${it.name}(${it.qty})`).join(', ');
 let action='';
-if(isManager && r.status==='Pending'){
+if(isManager&&r.status==='Pending'){
 action=`<button class="btn-success" onclick="approve(${i})">Approve</button>
 <button class="btn-danger" onclick="reject(${i})">Reject</button>`;
 }
@@ -395,6 +432,27 @@ const requests=getData('requests');
 requests[i].status='Rejected';
 saveData('requests',requests);
 renderAll();
+}
+
+function buildPinReset(){
+const builders=getData('builders');
+pinResetSection.innerHTML="<h4>Reset Builder PIN</h4>";
+builders.forEach((b,i)=>{
+pinResetSection.innerHTML+=`
+${b.name}: 
+<input type="text" id="newPin_${i}" placeholder="New PIN">
+<button class="btn-warning" onclick="resetPin(${i})">Update</button>
+<br><br>`;
+});
+}
+
+function resetPin(i){
+const builders=getData('builders');
+const newPin=document.getElementById(`newPin_${i}`).value.trim();
+if(!newPin)return;
+builders[i].pin=newPin;
+saveData('builders',builders);
+alert("PIN Updated");
 }
 
 function renderAll(){
