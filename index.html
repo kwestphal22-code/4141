@@ -1,0 +1,408 @@
+🚀 PROFESSIONAL INVENTORY SYSTEM (FINAL VERSION)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpaceOptions Pro Inventory</title>
+
+<style>
+:root{
+--primary:#2563eb;
+--dark:#111827;
+--success:#16a34a;
+--danger:#dc2626;
+--warning:#f59e0b;
+--bg:#f3f4f6;
+}
+
+body{
+margin:0;
+font-family:Segoe UI, sans-serif;
+background:var(--bg);
+color:#1f2937;
+}
+
+header{
+background:var(--dark);
+color:white;
+padding:18px 30px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+header h1{
+margin:0;
+font-size:20px;
+}
+
+.badge{
+padding:5px 10px;
+border-radius:20px;
+font-size:12px;
+font-weight:bold;
+}
+
+.manager{background:var(--success);}
+.builder{background:var(--primary);}
+
+nav{
+background:#1f2937;
+display:flex;
+}
+
+nav button{
+flex:1;
+padding:14px;
+border:none;
+background:none;
+color:white;
+cursor:pointer;
+transition:.2s;
+}
+
+nav button.active,
+nav button:hover{
+background:var(--primary);
+}
+
+.container{
+padding:25px;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:10px;
+box-shadow:0 4px 12px rgba(0,0,0,.06);
+margin-bottom:25px;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:10px;
+}
+
+th,td{
+padding:10px;
+border-bottom:1px solid #e5e7eb;
+text-align:center;
+}
+
+th{
+background:var(--primary);
+color:white;
+font-weight:500;
+}
+
+button{
+padding:6px 12px;
+border:none;
+border-radius:6px;
+cursor:pointer;
+font-weight:500;
+}
+
+.btn-primary{background:var(--primary);color:white;}
+.btn-success{background:var(--success);color:white;}
+.btn-danger{background:var(--danger);color:white;}
+.btn-warning{background:var(--warning);color:white;}
+
+button:hover{opacity:.85;}
+
+input,select{
+padding:6px;
+border-radius:6px;
+border:1px solid #d1d5db;
+}
+
+.low{color:var(--danger);font-weight:bold;}
+.status-pending{color:var(--warning);font-weight:bold;}
+.status-approved{color:var(--success);font-weight:bold;}
+.status-rejected{color:var(--danger);font-weight:bold;}
+
+.hidden{display:none;}
+
+#login{
+max-width:400px;
+margin:100px auto;
+}
+</style>
+</head>
+<body>
+
+<div id="login" class="card">
+<h2>Login</h2>
+<input id="username" placeholder="Name"><br><br>
+<input id="pin" type="password" placeholder="PIN"><br><br>
+<button class="btn-primary" onclick="login()">Login</button>
+</div>
+
+<div id="app" class="hidden">
+
+<header>
+<h1>SpaceOptions Inventory System</h1>
+<div>
+<span id="roleBadge" class="badge"></span>
+<button class="btn-danger" onclick="logout()">Logout</button>
+</div>
+</header>
+
+<nav>
+<button class="tabBtn active" data-tab="dashboard">Dashboard</button>
+<button class="tabBtn" data-tab="inventory">Inventory</button>
+<button class="tabBtn" data-tab="requests">Requests</button>
+</nav>
+
+<div class="container">
+
+<div id="dashboard" class="tab">
+<div class="card">
+<h3>System Overview</h3>
+<p>Total Materials: <b id="totalMaterials"></b></p>
+<p>Low Stock Items: <b id="lowCount"></b></p>
+<p>Pending Requests: <b id="pendingCount"></b></p>
+</div>
+</div>
+
+<div id="inventory" class="tab hidden">
+<div class="card">
+<h3>Inventory</h3>
+<input id="search" placeholder="Search material..." onkeyup="renderInventory()">
+<table>
+<thead>
+<tr>
+<th>Material</th>
+<th>Type</th>
+<th>Quantity</th>
+<th>Min</th>
+<th>Adjust</th>
+</tr>
+</thead>
+<tbody id="inventoryBody"></tbody>
+</table>
+</div>
+</div>
+
+<div id="requests" class="tab hidden">
+<div class="card">
+<h3>New Request</h3>
+<div id="requestForm"></div>
+<button id="submitRequest" class="btn-primary" onclick="submitRequest()">Submit Request</button>
+</div>
+
+<div class="card">
+<h3>All Requests</h3>
+<table>
+<thead>
+<tr>
+<th>Builder</th>
+<th>Job</th>
+<th>Items</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="requestsBody"></tbody>
+</table>
+</div>
+</div>
+
+</div>
+</div>
+
+<script>
+const builders=[
+{name:'Panther',pin:'1234'},
+{name:'Will',pin:'1234'},
+{name:'Brady',pin:'1234'},
+{name:'Kaleb',pin:'1234'}
+];
+
+const manager={name:'manager',pin:'admin123'};
+
+const defaultMaterials=[
+{name:'Wire Shelf',type:'Wire',qty:500,min:100},
+{name:'Wood Shelf',type:'Wood',qty:300,min:50},
+{name:'Brackets',type:'Hardware',qty:1000,min:200},
+{name:'Screws',type:'Hardware',qty:2000,min:500}
+];
+
+if(!localStorage.getItem('materials'))
+localStorage.setItem('materials',JSON.stringify(defaultMaterials));
+
+if(!localStorage.getItem('requests'))
+localStorage.setItem('requests',JSON.stringify([]));
+
+let currentUser=null;
+let isManager=false;
+
+function getData(k){return JSON.parse(localStorage.getItem(k)||'[]');}
+function saveData(k,d){localStorage.setItem(k,JSON.stringify(d));}
+
+function login(){
+const u=username.value.trim();
+const p=pin.value.trim();
+
+if(builders.find(b=>b.name===u&&b.pin===p)){currentUser=u;isManager=false;}
+else if(u===manager.name&&p===manager.pin){currentUser=u;isManager=true;}
+else{alert("Invalid login");return;}
+
+login.classList.add("hidden");
+app.classList.remove("hidden");
+roleBadge.textContent=isManager?"Manager":"Builder";
+roleBadge.className="badge "+(isManager?"manager":"builder");
+
+if(isManager){
+requestForm.innerHTML="";
+submitRequest.style.display="none";
+}
+else{
+buildRequestForm();
+}
+
+renderAll();
+}
+
+function logout(){location.reload();}
+
+document.querySelectorAll(".tabBtn").forEach(btn=>{
+btn.onclick=()=>{
+document.querySelectorAll(".tabBtn").forEach(b=>b.classList.remove("active"));
+document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
+btn.classList.add("active");
+document.getElementById(btn.dataset.tab).classList.remove("hidden");
+renderAll();
+};
+});
+
+function renderDashboard(){
+const materials=getData('materials');
+const requests=getData('requests');
+totalMaterials.textContent=materials.length;
+lowCount.textContent=materials.filter(m=>m.qty<=m.min).length;
+pendingCount.textContent=requests.filter(r=>r.status==='Pending').length;
+}
+
+function renderInventory(){
+const materials=getData('materials');
+const searchVal=search.value.toLowerCase();
+inventoryBody.innerHTML='';
+
+materials.filter(m=>m.name.toLowerCase().includes(searchVal))
+.forEach((m,i)=>{
+inventoryBody.innerHTML+=`
+<tr>
+<td>${m.name}</td>
+<td>${m.type}</td>
+<td class="${m.qty<=m.min?'low':''}">${m.qty}</td>
+<td>${m.min}</td>
+<td>
+<button class="btn-success" onclick="adjust(${i},10)">+10</button>
+<button class="btn-danger" onclick="adjust(${i},-10)">-10</button>
+</td>
+</tr>`;
+});
+}
+
+function adjust(i,delta){
+const materials=getData('materials');
+materials[i].qty+=delta;
+if(materials[i].qty<0)materials[i].qty=0;
+saveData('materials',materials);
+renderAll();
+}
+
+function buildRequestForm(){
+const materials=getData('materials');
+requestForm.innerHTML=`Job: <input id="jobName"><br><br>`;
+materials.forEach((m,i)=>{
+requestForm.innerHTML+=`
+${m.name}:
+<input type="number" id="req_${i}" style="width:80px;"> sq ft<br><br>`;
+});
+}
+
+function submitRequest(){
+const job=jobName.value.trim();
+if(!job){alert("Enter job name");return;}
+
+const materials=getData('materials');
+let items=[];
+materials.forEach((m,i)=>{
+const qty=parseInt(document.getElementById(`req_${i}`).value);
+if(qty>0)items.push({name:m.name,qty});
+});
+if(items.length===0){alert("Enter quantities");return;}
+
+const requests=getData('requests');
+requests.push({builder:currentUser,job,items,status:'Pending'});
+saveData('requests',requests);
+renderAll();
+alert("Request submitted");
+}
+
+function renderRequests(){
+let requests=getData('requests');
+requestsBody.innerHTML='';
+
+if(!isManager)
+requests=requests.filter(r=>r.builder===currentUser);
+
+requests.forEach((r,i)=>{
+const list=r.items.map(it=>`${it.name}(${it.qty})`).join(', ');
+let action='';
+if(isManager && r.status==='Pending'){
+action=`<button class="btn-success" onclick="approve(${i})">Approve</button>
+<button class="btn-danger" onclick="reject(${i})">Reject</button>`;
+}
+requestsBody.innerHTML+=`
+<tr>
+<td>${r.builder}</td>
+<td>${r.job}</td>
+<td>${list}</td>
+<td class="status-${r.status.toLowerCase()}">${r.status}</td>
+<td>${action}</td>
+</tr>`;
+});
+}
+
+function approve(i){
+const requests=getData('requests');
+const materials=getData('materials');
+const r=requests[i];
+
+for(let item of r.items){
+const m=materials.find(x=>x.name===item.name);
+if(!m||m.qty<item.qty){alert("Not enough stock");return;}
+}
+
+r.items.forEach(item=>{
+const m=materials.find(x=>x.name===item.name);
+m.qty-=item.qty;
+});
+
+r.status='Approved';
+saveData('materials',materials);
+saveData('requests',requests);
+renderAll();
+}
+
+function reject(i){
+const requests=getData('requests');
+requests[i].status='Rejected';
+saveData('requests',requests);
+renderAll();
+}
+
+function renderAll(){
+renderDashboard();
+renderInventory();
+renderRequests();
+}
+</script>
+
+</body>
+</html>
